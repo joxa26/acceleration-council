@@ -32,8 +32,18 @@ jobs:
           NOTION_DATABASE_ID: ${{ secrets.NOTION_DATABASE_ID }}
         run: python -m src.cli --limit "${{ github.event.inputs.limit || '15' }}"
 
+      - name: Check for CSV output
+        id: check_csv
+        if: always()
+        run: |
+          if [ -f output/leads.csv ]; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - uses: actions/upload-artifact@v4
-        if: ${{ !secrets.NOTION_API_KEY }}
+        if: steps.check_csv.outputs.exists == 'true'
         with:
           name: vendorix-leads-${{ github.run_id }}
           path: growth/vendorix-leadgen/output/leads.csv
