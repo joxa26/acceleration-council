@@ -10,10 +10,14 @@ Automating LinkedIn login, connection requests, or DMs violates LinkedIn's Terms
 
 1. Reads the Ideal Customer Profile (`config/icp.yaml`) describing Vendorix's target buyers.
 2. Uses Claude (`claude-opus-5`) with the server-side web-search tool to find people/companies whose public presence, role, or company matches that ICP.
-3. For each lead, drafts:
+3. For each lead, drafts (in **Serbian** by default — see below):
    - A short, specific LinkedIn connection note (≤300 characters)
    - A follow-up DM to send after the connection is accepted
 4. Writes new leads straight into the **Leads** database under the Vendorix Lead Capturer Notion page (deduped against what's already there), or to a local CSV if Notion isn't configured.
+
+## Outreach language
+
+Vendorix's initial target market is Serbian companies, so `connection_note`, `followup_dm`, and `fit_reason` are drafted in natural, fluent business Serbian (Latin script, formal "Vi" register) by default. Leads that are clearly part of the secondary English-speaking market (see `config/icp.yaml` → `geography`) get English outreach instead. Factual fields (name, title, company, URLs) are never translated. Edit `prompts/system_prompt.md` → `## Language` if you want a different default.
 
 ## Setup
 
@@ -49,15 +53,15 @@ Each new lead lands in Notion with `Status = New`. Review every draft before sen
 | Company | text | agent |
 | LinkedIn Profile | url | agent (only if a real, verified profile URL was found) |
 | Contact/Email | email | agent, only if publicly listed — never guessed |
-| Connection Note | text | agent — the ≤300 char connection request |
-| Outreach Message | text | agent — the follow-up DM sent after connecting |
-| Fit Reason | text | agent — why this lead matches the ICP, for quick review |
+| Connection Note | text | agent — the ≤300 char connection request (Serbian by default) |
+| Outreach Message | text | agent — the follow-up DM sent after connecting (Serbian by default) |
+| Fit Reason | text | agent — why this lead matches the ICP, for quick review (Serbian by default) |
 | Source URL | url | agent — the page the lead was found/verified on |
 | Status | select | defaults to `New`; you update it as leads progress |
 
 ## Configuring the ICP
 
-Edit `config/icp.yaml` to change target personas, geography, or messaging as the product evolves. `prompts/system_prompt.md` controls the researcher's behavior and guardrails (no scraping, no fabricated profiles/emails, message tone) — edit it if you want stricter or looser sourcing rules.
+Edit `config/icp.yaml` to change target personas, geography, or messaging as the product evolves. `prompts/system_prompt.md` controls the researcher's behavior and guardrails (no scraping, no fabricated profiles/emails, message tone, outreach language) — edit it if you want stricter or looser sourcing rules.
 
 ## Scheduling
 

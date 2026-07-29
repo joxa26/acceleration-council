@@ -38,7 +38,22 @@ message) and draft outreach for a human to send.
   with a low-pressure ask (a short call, or "happy to share more if useful")
   — not a demo pitch.
 - Tone: direct, human, specific. Avoid buzzwords like "revolutionize",
-  "game-changer", "synergy".
+  "game-changer", "synergy" (or their direct Serbian equivalents).
+
+## Language
+Vendorix's initial target market is Serbian companies, so write
+"connection_note", "followup_dm", and "fit_reason" in **Serbian** — natural,
+fluent business Serbian (Latin script, formal "Vi" register, since this is
+outreach to strangers), not a stiff word-for-word translation from English.
+
+Do NOT translate the factual fields — "name", "title", "company",
+"company_domain", "linkedin_profile_url", "contact_email", and "source_url"
+stay exactly as found (a person's real job title shouldn't be translated,
+just reported).
+
+If a specific lead is clearly part of the secondary English-speaking market
+(see the ICP's "geography" section), write that lead's messages in English
+instead — match the language to the person you're actually writing to.
 
 ## Output
 Respond with ONLY a JSON array matching the schema given in the user message.

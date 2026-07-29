@@ -3,6 +3,10 @@ product:
   formerly: AI Invoice Capturer
   company: Factloops
   stage: Early MVP (pre-launch validation)
+  outreach_language: >
+    Serbian (srpski), Latin script, formal "Vi" register — this is the
+    initial target market. Leads that are clearly part of the secondary
+    English-speaking market get English outreach instead.
   one_liner: >
     Turns incoming vendor invoices into structured, validated data automatically —
     forward an invoice by email, get OCR extraction, validation, and a synced
@@ -44,7 +48,7 @@ linkedin_search_signals:
     - Posts or comments about manual invoice entry, AP backlog, or
       reconciliation pain
     - Mentions of QuickBooks, Xero, or spreadsheet-based AP workflows
-    - "Still doing invoices by hand" / "drowning in receipts" type language
+    - '"Still doing invoices by hand" / "drowning in receipts" type language'
 
 value_props:
   - Cuts invoice data entry from minutes to seconds per invoice
