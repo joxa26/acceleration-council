@@ -1,0 +1,40 @@
+name: Vendorix — Lead Research
+
+on:
+  workflow_dispatch:
+    inputs:
+      limit:
+        description: "Max new leads to find this run"
+        required: false
+        default: "15"
+  schedule:
+    - cron: "0 8 * * 1" # Mondays 08:00 UTC
+
+jobs:
+  research-leads:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: growth/vendorix-leadgen
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - run: pip install -r requirements.txt
+
+      - name: Research leads
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          NOTION_API_KEY: ${{ secrets.NOTION_API_KEY }}
+          NOTION_DATABASE_ID: ${{ secrets.NOTION_DATABASE_ID }}
+        run: python -m src.cli --limit "${{ github.event.inputs.limit || '15' }}"
+
+      - uses: actions/upload-artifact@v4
+        if: ${{ !secrets.NOTION_API_KEY }}
+        with:
+          name: vendorix-leads-${{ github.run_id }}
+          path: growth/vendorix-leadgen/output/leads.csv
+          retention-days: 90

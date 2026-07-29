@@ -1,0 +1,61 @@
+product:
+  name: Vendorix
+  formerly: AI Invoice Capturer
+  company: Factloops
+  stage: Early MVP (pre-launch validation)
+  one_liner: >
+    Turns incoming vendor invoices into structured, validated data automatically —
+    forward an invoice by email, get OCR extraction, validation, and a synced
+    record (Airtable now, accounting-system sync coming next), with Slack alerts
+    on anything that needs a human look.
+  primary_pain: >
+    Bookkeepers and finance teams still manually retype vendor invoices into
+    spreadsheets or accounting software. It's slow, error-prone, and doesn't
+    scale — especially for anyone handling AP across multiple clients or a
+    growing pile of vendors.
+
+target_personas:
+  - Bookkeepers and outsourced/fractional accounting firms managing AP for
+    multiple SMB clients
+  - Finance managers, controllers, and AP/AR specialists at SMBs
+    (roughly 10-250 employees)
+  - Founders or office managers at small businesses who personally process
+    invoices because there's no dedicated finance hire yet
+  - Accounting firm owners looking to cut manual data-entry time across
+    their client base
+
+geography:
+  primary: Serbia and the wider Balkans / Southeast Europe (where the product
+    is being validated first)
+  secondary: English-speaking SMB market broadly (US, UK, EU) — useful once
+    the pipeline needs more volume
+
+linkedin_search_signals:
+  titles:
+    - Bookkeeper
+    - Accounts Payable
+    - AP Specialist
+    - Controller
+    - Finance Manager
+    - Accounting Manager
+    - Office Manager
+    - Owner (small business, non-enterprise)
+  content_signals:
+    - Posts or comments about manual invoice entry, AP backlog, or
+      reconciliation pain
+    - Mentions of QuickBooks, Xero, or spreadsheet-based AP workflows
+    - "Still doing invoices by hand" / "drowning in receipts" type language
+
+value_props:
+  - Cuts invoice data entry from minutes to seconds per invoice
+  - Reduces the manual-entry errors that cause payment and reconciliation
+    problems
+  - No new software habit required — just forward invoices by email
+  - Syncs into systems the team already uses
+
+exclusions:
+  - Enterprise companies with AP automation already deployed (Bill.com,
+    Tipalti, Stampli, etc.)
+  - Businesses with very low invoice volume where manual entry isn't a
+    real pain point
+  - Software vendors / AI tooling companies (not the target buyer)
