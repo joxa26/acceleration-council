@@ -1,0 +1,465 @@
+{
+  "name": "Invoice Capture - Email to Notion",
+  "nodes": [
+    {
+      "parameters": {
+        "mailbox": "INBOX",
+        "postProcessAction": "read",
+        "downloadAttachments": true,
+        "format": "resolved",
+        "dataPropertyAttachmentsPrefixName": "attachment_",
+        "options": {}
+      },
+      "id": "4fe1a119-9639-49eb-8db0-8a414e9f42e1",
+      "name": "IMAP Email Trigger",
+      "type": "n8n-nodes-base.emailReadImap",
+      "typeVersion": 2,
+      "position": [
+        -160,
+        260
+      ],
+      "credentials": {
+        "imap": {
+          "id": "",
+          "name": "Invoices Inbox (IMAP)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Keep only PDF attachments and turn each one into its own item\n// so multi-invoice emails are processed one invoice at a time.\nconst results = [];\nconst binaryKeys = Object.keys(item.binary || {});\n\nfor (const key of binaryKeys) {\n  const bin = item.binary[key];\n  if (!bin || bin.mimeType !== 'application/pdf') continue;\n\n  results.push({\n    json: {\n      fileName: bin.fileName || `${key}.pdf`,\n      email_subject: item.json.subject || '',\n      email_from: item.json.from ? item.json.from.text || item.json.from : '',\n      email_date: item.json.date || new Date().toISOString()\n    },\n    binary: {\n      data: bin\n    }\n  });\n}\n\nreturn results;"
+      },
+      "id": "8413d2da-5beb-4411-a89a-ffaf20ac4c81",
+      "name": "Extract PDF Attachments",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        80,
+        260
+      ]
+    },
+    {
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      },
+      "id": "1a0452b8-c2b3-4194-8670-50b91cd045f0",
+      "name": "Loop Over Invoices",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        320,
+        260
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "pdf",
+        "binaryPropertyName": "data",
+        "options": {}
+      },
+      "id": "e2436e73-a1c2-45ee-b2d5-d038237cd7f5",
+      "name": "Extract Text From PDF",
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1,
+      "position": [
+        560,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-4o-mini",
+          "mode": "list"
+        },
+        "options": {
+          "temperature": 0
+        }
+      },
+      "id": "5d0ad09c-de07-41b9-91ae-5248e83e3bf9",
+      "name": "OpenAI Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        560,
+        400
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "",
+          "name": "OpenAI account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "text": "={{ $json.text }}",
+        "schemaType": "fromAttributes",
+        "attributes": {
+          "attributes": [
+            {
+              "name": "vendor_name",
+              "description": "Name of the company or person that issued the invoice",
+              "required": true
+            },
+            {
+              "name": "invoice_number",
+              "description": "The invoice or reference number printed on the document",
+              "required": true
+            },
+            {
+              "name": "invoice_date",
+              "description": "The date the invoice was issued, in YYYY-MM-DD format",
+              "required": true
+            },
+            {
+              "name": "due_date",
+              "description": "The payment due date, in YYYY-MM-DD format",
+              "required": false
+            },
+            {
+              "name": "subtotal",
+              "description": "The subtotal amount before tax, as a plain number",
+              "required": false
+            },
+            {
+              "name": "tax_amount",
+              "description": "The total tax amount, as a plain number",
+              "required": false
+            },
+            {
+              "name": "total_amount",
+              "description": "The final total amount due, as a plain number",
+              "required": true
+            },
+            {
+              "name": "currency",
+              "description": "The 3-letter ISO currency code (e.g. USD, EUR)",
+              "required": false
+            },
+            {
+              "name": "po_number",
+              "description": "Purchase order number referenced on the invoice, if any",
+              "required": false
+            }
+          ]
+        },
+        "options": {
+          "systemPromptTemplate": "You are an expert at reading invoices. Extract the requested fields exactly as they appear in the document. If a field is missing, leave it empty rather than guessing."
+        }
+      },
+      "id": "e721f455-4d2c-4854-9cb8-f08e0c414842",
+      "name": "Extract Invoice Fields (AI)",
+      "type": "@n8n/n8n-nodes-langchain.informationExtractor",
+      "typeVersion": 1,
+      "position": [
+        800,
+        260
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Normalize the AI output and decide whether the invoice is ready to\n// file automatically or needs a human to review it.\nconst extracted = item.json.output || item.json;\n\nconst vendor = (extracted.vendor_name || '').trim();\nconst invoiceNumber = (extracted.invoice_number || '').trim();\nconst total = parseFloat(extracted.total_amount);\n\nconst missing = [];\nif (!vendor) missing.push('vendor_name');\nif (!invoiceNumber) missing.push('invoice_number');\nif (Number.isNaN(total)) missing.push('total_amount');\n\nreturn {\n  json: {\n    vendor_name: vendor,\n    invoice_number: invoiceNumber,\n    invoice_date: extracted.invoice_date || '',\n    due_date: extracted.due_date || '',\n    subtotal: parseFloat(extracted.subtotal) || null,\n    tax_amount: parseFloat(extracted.tax_amount) || null,\n    total_amount: Number.isNaN(total) ? null : total,\n    currency: (extracted.currency || 'USD').toUpperCase(),\n    po_number: extracted.po_number || '',\n    file_name: $('Extract PDF Attachments').item.json.fileName,\n    email_subject: $('Extract PDF Attachments').item.json.email_subject,\n    email_from: $('Extract PDF Attachments').item.json.email_from,\n    email_date: $('Extract PDF Attachments').item.json.email_date,\n    status: missing.length === 0 ? 'Captured' : 'Needs Review',\n    missing_fields: missing.join(', ')\n  }\n};"
+      },
+      "id": "28319936-2fa9-45de-83c6-551ecec2a289",
+      "name": "Validate & Normalize",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1040,
+        260
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "Captured",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "4a1978e9-9231-450d-8878-753c37a1fb46",
+      "name": "Extraction Complete?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1280,
+        260
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "create",
+        "databaseId": {
+          "__rl": true,
+          "value": "YOUR_NOTION_INVOICES_DATABASE_ID",
+          "mode": "id"
+        },
+        "title": "={{ $json.vendor_name }} - {{ $json.invoice_number }}",
+        "propertiesUi": {
+          "propertyValues": [
+            {
+              "key": "Vendor|rich_text",
+              "textValue": "={{ $json.vendor_name }}"
+            },
+            {
+              "key": "Invoice Number|rich_text",
+              "textValue": "={{ $json.invoice_number }}"
+            },
+            {
+              "key": "Invoice Date|date",
+              "dateValue": "={{ $json.invoice_date }}"
+            },
+            {
+              "key": "Due Date|date",
+              "dateValue": "={{ $json.due_date }}"
+            },
+            {
+              "key": "Total Amount|number",
+              "numberValue": "={{ $json.total_amount }}"
+            },
+            {
+              "key": "Currency|select",
+              "selectValue": "={{ $json.currency }}"
+            },
+            {
+              "key": "PO Number|rich_text",
+              "textValue": "={{ $json.po_number }}"
+            },
+            {
+              "key": "Status|select",
+              "selectValue": "Captured"
+            },
+            {
+              "key": "Source Email|rich_text",
+              "textValue": "={{ $json.email_from }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "46435cf9-3c23-4d64-bd14-aba4aab92a34",
+      "name": "Create Notion Invoice Page",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [
+        1520,
+        140
+      ],
+      "credentials": {
+        "notionApi": {
+          "id": "",
+          "name": "Notion account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fromEmail": "invoices-bot@yourcompany.com",
+        "toEmail": "ap-team@yourcompany.com",
+        "subject": "=Manual review needed: invoice from {{ $json.email_from }}",
+        "text": "=An invoice could not be fully auto-captured and needs manual review.\n\nFile: {{ $json.file_name }}\nFrom: {{ $json.email_from }}\nSubject: {{ $json.email_subject }}\nMissing/invalid fields: {{ $json.missing_fields }}\n\nExtracted so far:\nVendor: {{ $json.vendor_name }}\nInvoice #: {{ $json.invoice_number }}\nTotal: {{ $json.total_amount }} {{ $json.currency }}",
+        "options": {}
+      },
+      "id": "405e875c-9f53-4760-bacb-57ba357ef4a5",
+      "name": "Notify Manual Review",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        1520,
+        380
+      ],
+      "credentials": {
+        "smtp": {
+          "id": "",
+          "name": "Invoices Bot (SMTP)"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "id": "38d8467b-c9dc-4c92-90ad-1d639abc101c",
+      "name": "Workflow Complete",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        560,
+        -60
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Invoice Capture Pipeline\n1. IMAP trigger polls the shared invoices inbox\n2. PDF attachments are split into one item each\n3. Each PDF's text is pulled out and sent to an LLM to extract structured fields\n4. Valid invoices are filed into Notion; incomplete ones trigger a manual-review email\n\nSet up before running:\n- IMAP credential for the invoices inbox\n- OpenAI credential for extraction\n- Notion credential + database ID (with matching property names/types)\n- SMTP credential for manual-review alerts",
+        "height": 340,
+        "width": 380
+      },
+      "id": "b1850659-6649-4db8-9163-d85223768e1c",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -160,
+        -200
+      ]
+    }
+  ],
+  "connections": {
+    "IMAP Email Trigger": {
+      "main": [
+        [
+          {
+            "node": "Extract PDF Attachments",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract PDF Attachments": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Invoices",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Invoices": {
+      "main": [
+        [
+          {
+            "node": "Workflow Complete",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Extract Text From PDF",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Text From PDF": {
+      "main": [
+        [
+          {
+            "node": "Extract Invoice Fields (AI)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Extract Invoice Fields (AI)",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Invoice Fields (AI)": {
+      "main": [
+        [
+          {
+            "node": "Validate & Normalize",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate & Normalize": {
+      "main": [
+        [
+          {
+            "node": "Extraction Complete?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extraction Complete?": {
+      "main": [
+        [
+          {
+            "node": "Create Notion Invoice Page",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Notify Manual Review",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Notion Invoice Page": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Invoices",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify Manual Review": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Invoices",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": [
+    {
+      "name": "invoice-capture"
+    },
+    {
+      "name": "finance"
+    }
+  ]
+}
